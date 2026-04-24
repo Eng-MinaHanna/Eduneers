@@ -842,16 +842,28 @@
                     </select>
                 </div>
 
-                <div class="grid-3">
+                <div class="grid-3" style="gap:10px; margin-bottom:10px;">
                     <div class="toggle-btn" id="attBtn" onclick="this.classList.toggle('active-att')">👤 حضور (15)</div>
-                    <div class="toggle-btn" id="feedBtn" onclick="this.classList.toggle('active-feed')">💬 فيدباك (5)
+                    <div class="toggle-btn" id="feedBtn" onclick="this.classList.toggle('active-feed')">💬 فيدباك
                     </div>
-                    <div class="toggle-btn" id="attitBtn" onclick="this.classList.toggle('active-attit')">⭐ سلوك (5)
+                    <div class="toggle-btn" id="attitBtn" onclick="this.classList.toggle('active-attit')">⭐ سلوك
                     </div>
                 </div>
 
-                <label style="font-size:13px; font-weight:bold; color:var(--text-muted);">بونص إضافي (Bonus)</label>
-                <input type="number" id="valBonus" placeholder="0">
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label style="font-size:11px; font-weight:bold; color:var(--text-muted); display:block; margin-bottom:4px;">درجة الفيدباك</label>
+                        <input type="number" id="valFeed" placeholder="0" style="margin:0; padding:10px; font-size:13px;">
+                    </div>
+                    <div>
+                        <label style="font-size:11px; font-weight:bold; color:var(--text-muted); display:block; margin-bottom:4px;">درجة السلوك</label>
+                        <input type="number" id="valAttitude" placeholder="0" style="margin:0; padding:10px; font-size:13px;">
+                    </div>
+                    <div>
+                        <label style="font-size:11px; font-weight:bold; color:var(--text-muted); display:block; margin-bottom:4px;">البونص</label>
+                        <input type="number" id="valBonus" placeholder="0" style="margin:0; padding:10px; font-size:13px;">
+                    </div>
+                </div>
 
                 <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1); margin:15px 0;">
 
@@ -1145,16 +1157,34 @@
             const monitor = document.getElementById('mappedLinksMonitor');
             if (!monitor) return;
             let linksMap = JSON.parse(localStorage.getItem('PERSONAL_LINKS_MAP') || '{}');
+            const currentGroup = localStorage.getItem('userGroup') || "Group A";
+            const groupApiUrl = localStorage.getItem(`GROUP_API_${currentGroup}`) || "";
 
             let html = "";
-            for (let code in linksMap) {
-                html += `<div style="border-bottom:1px solid rgba(255,255,255,0.05); padding:4px 0; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
-                            <span style="color:var(--electric-blue); font-weight:bold;">${code}</span>
-                            <span style="opacity:0.6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%; margin:0 10px;">${linksMap[code]}</span>
-                            <button onclick="removePersonalLink('${code}')" style="background:none; border:none; color:#ef4444; cursor:pointer;" title="حذف">🗑️</button>
-                         </div>`;
+
+            // إظهار رابط الجروب الأساسي في الأعلى
+            html += `<div style="border-bottom:2px solid rgba(245,176,65,0.3); padding:6px 0; margin-bottom:8px;">
+                        <div style="font-size:10px; color:var(--accent); font-weight:bold; margin-bottom:2px;">🔗 رابط شيت الجروب الأساسي (Group Scope):</div>
+                        <div style="font-family:monospace; font-size:9px; color:#fff; word-break:break-all; opacity:0.8;">${groupApiUrl ? groupApiUrl.substring(0, 70) + '...' : '❌ لم يتم ضبطه بعد'}</div>
+                     </div>`;
+
+            let count = Object.keys(linksMap).length;
+            if (count > 0) {
+                html += `<div style="font-size:10px; color:var(--electric-blue); margin-bottom:5px; font-weight:bold;">📋 الروابط الفردية المربوطة (${count} طالب):</div>`;
+                for (let code in linksMap) {
+                    const url = linksMap[code];
+                    const shortUrl = url ? url.substring(url.indexOf('/s/') + 3, url.indexOf('/s/') + 18) + '...' : 'غير محدد';
+                    html += `<div style="border-bottom:1px solid rgba(255,255,255,0.05); padding:4px 0; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+                                <span style="color:var(--electric-blue); font-weight:bold; font-size:10px;">${code}</span>
+                                <span style="opacity:0.7; font-size:9px; font-family:monospace; margin: 0 6px;">${shortUrl}</span>
+                                <button onclick="removePersonalLink('${code}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px;" title="حذف">🗑️</button>
+                             </div>`;
+                }
+            } else {
+                html += `<div style='text-align:center; opacity:0.5; font-size:10px; margin-top:8px;'>لا يوجد روابط فردية مسجلة حالياً...</div>`;
             }
-            monitor.innerHTML = html || "<div style='text-align:center; opacity:0.5;'>لا يوجد روابط مسجلة حالياً...</div>";
+
+            monitor.innerHTML = html;
         }
 
         function removePersonalLink(code) {
@@ -1287,23 +1317,30 @@
                 }
             }
 
-            let f = document.getElementById('feedBtn').classList.contains('active-feed') ? 1 : 0;
-            let a = document.getElementById('attitBtn').classList.contains('active-attit') ? 5 : 0;
-            let b = convertNumerals(document.getElementById('valBonus').value) || 0;
+            let f = parseFloat(convertNumerals(document.getElementById('valFeed').value)) || 0;
+            let a = parseFloat(convertNumerals(document.getElementById('valAttitude').value)) || 0;
+            let b = parseFloat(convertNumerals(document.getElementById('valBonus').value)) || 0;
 
-            if (f || a || b != 0) {
-                p.push(fetch(`${getEffectiveApi(EXTRA_API)}?action=saveExtra&qrCode=${code}&lectureNum=${lec}&feedback=${f}&attitude=${a}&bonus=${b}${auth}`).then(r => r.json()).catch(e => ({})));
+            // تحقق من toggle — إذا كان مفعلاً واستخدم القيمة المدخلة أو القيمة الافتراضية
+            const feedActive = document.getElementById('feedBtn').classList.contains('active-feed');
+            const attitActive = document.getElementById('attitBtn').classList.contains('active-attit');
+            const feedVal = feedActive ? (f || 5) : f;
+            const attitVal = attitActive ? (a || 5) : a;
 
-                let combinedAttitude = 0;
-                if (f) combinedAttitude += 5;
-                if (a) combinedAttitude += 5;
+            if (feedVal || attitVal || b) {
+                p.push(fetch(`${getEffectiveApi(EXTRA_API)}?action=saveExtra&qrCode=${code}&lectureNum=${lec}&feedback=${feedVal}&attitude=${attitVal}&bonus=${b}${auth}`).then(r => r.json()).catch(e => ({})));
 
-                if (personalApiUrl && combinedAttitude > 0) {
-                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('attitude .10')}&val=${combinedAttitude}`)
-                        .then(r => r.json()).then(res => console.log("Sync Combined Attitude:", res)).catch(e => console.error("Sync Error:", e)));
+                if (personalApiUrl && feedVal > 0) {
+                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('attendance .15')}&val=${feedVal}`)
+                        .then(r => r.json()).then(res => console.log("Sync Feed:", res)).catch(e => console.error("Sync Error:", e)));
                 }
 
-                if (personalApiUrl && b) {
+                if (personalApiUrl && attitVal > 0) {
+                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('attitude .10')}&val=${attitVal}`)
+                        .then(r => r.json()).then(res => console.log("Sync Attitude:", res)).catch(e => console.error("Sync Error:", e)));
+                }
+
+                if (personalApiUrl && b > 0) {
                     p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('bonus')}&val=${b}`)
                         .then(r => r.json()).then(res => console.log("Sync Bonus:", res)).catch(e => console.error("Sync Error:", e)));
                 }
@@ -1318,6 +1355,8 @@
             document.getElementById('valTask').value = "";
             document.getElementById('valQuiz').value = "";
             document.getElementById('valBonus').value = "";
+            document.getElementById('valFeed').value = "";
+            document.getElementById('valAttitude').value = "";
             document.getElementById('attBtn').classList.remove('active-att');
             document.getElementById('feedBtn').classList.remove('active-feed');
             document.getElementById('attitBtn').classList.remove('active-attit');
@@ -1351,44 +1390,51 @@
             let numRaw = document.getElementById('searchCode').value.trim();
             if (!numRaw) return showToast("❌ برجاء إدخال رقم الطالب", "error");
 
-            let num = convertNumerals(numRaw); // 🔴 تحويل الأرقام للعربي
+            let num = convertNumerals(numRaw);
             let fl = document.getElementById('sfL').value, tl = document.getElementById('stL').value;
             if (parseInt(fl) > parseInt(tl)) return showToast("❌ نطاق المحاضرات غير صحيح", "error");
 
-            const group = localStorage.getItem('userGroup');
-            const code = group.replace("Group ", "").trim() + num + "EDUR9";
+            const group = localStorage.getItem('userGroup') || "Group A";
+            const groupLetter = group.replace("Group ", "").trim();
+            const code = groupLetter + num + "EDUR9";
             const auth = getAuthParams() + `&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}`;
 
-            showLoader(true, "جاري استرجاع سجلات الطالب 🔍...");
+            // استخدام رابط الجروب المركزي كمصدر وحيد للحقيقة
+            const groupApi = getEffectiveApi("");
+            if (!groupApi) return showToast("❌ لم يتم ضبط رابط شيت الجروب في الإعدادات!", "error");
+
+            showLoader(true, "جاري استرجاع سجلات الطالب من شيت الجروب 🔍...");
             try {
+                // نرسل requests منفصلة كلها لنفس الرابط المركزي مع action مختلف
                 const [rA, rX, rT, rQ] = await Promise.all([
-                    fetch(`${getEffectiveApi(ATTEND_API)}?action=getTop&weight=15${auth}`).then(r => r.json()),
-                    fetch(`${getEffectiveApi(EXTRA_API)}?action=getTop${auth}`).then(r => r.json()),
-                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop${auth}`).then(r => r.json()),
-                    fetch(`${getEffectiveApi(QUIZ_API)}?action=getTop${auth}`).then(r => r.json())
+                    fetch(`${groupApi}?action=getTop&weight=15${auth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
+                    fetch(`${groupApi}?action=getTopExtra${auth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
+                    fetch(`${groupApi}?action=getTopGrades${auth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
+                    fetch(`${groupApi}?action=getTopQuiz${auth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] }))
                 ]);
 
                 let total = 0; let html = "";
-                const addRow = (res, label) => {
+                const addRow = (res, label, icon) => {
                     let s = (res.scores || []).find(x => x.id === code);
                     let val = (s && !isNaN(parseFloat(s.total))) ? parseFloat(s.total) : 0;
-                    html += `<tr><td>${label}</td><td><span style="color:var(--electric-blue); font-size:1.1rem;">${val}</span></td></tr>`;
+                    let color = val > 0 ? 'var(--electric-blue)' : 'rgba(255,255,255,0.3)';
+                    html += `<tr><td>${icon} ${label}</td><td><span style="color:${color}; font-size:1.1rem; font-weight:900;">${val}</span></td></tr>`;
                     total += val;
                     if (s && s.name) document.getElementById('resName').innerText = s.name;
                 };
 
-                document.getElementById('resName').innerText = "لم يتم العثور على اسم";
-                addRow(rA, "إجمالي الحضور");
-                addRow(rX, "إجمالي (الفيدباك + السلوك + البونص)");
-                addRow(rT, "إجمالي التاسكات");
-                addRow(rQ, "إجمالي الكويزات");
+                document.getElementById('resName').innerText = code + " — " + group;
+                addRow(rA, "إجمالي الحضور", "👤");
+                addRow(rX, "إجمالي (الفيدباك + السلوك + البونص)", "⭐");
+                addRow(rT, "إجمالي التاسكات", "📝");
+                addRow(rQ, "إجمالي الكويزات", "📊");
 
                 document.getElementById('searchResult').style.display = 'block';
                 document.getElementById('resDetails').innerHTML = html;
                 document.getElementById('resTotal').innerText = total;
                 showLoader(false);
 
-            } catch (e) { showLoader(false); showToast("❌ خطأ في جلب البيانات", "error"); }
+            } catch (e) { showLoader(false); showToast("❌ خطأ في جلب البيانات من شيت الجروب", "error"); }
         }
 
         let fullLeaderboard = [];
