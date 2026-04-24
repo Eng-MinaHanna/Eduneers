@@ -1272,7 +1272,7 @@
             return `&email=${encodeURIComponent(localStorage.getItem('userEmail'))}&token=${encodeURIComponent(localStorage.getItem('sessionToken'))}&group=${encodeURIComponent(localStorage.getItem('userGroup'))}`;
         }
 
-        function submitData() {
+function submitData() {
             let numRaw = document.getElementById('studentCode').value.trim();
             if (!numRaw) return showToast("❌ برجاء إدخال رقم كود الطالب", "error");
 
@@ -1282,63 +1282,41 @@
             const lec = document.getElementById('currentLecNum').value;
             const auth = getAuthParams();
 
-            let p = [];
-            let taskNameCol = "TASK " + lec;
-            let personalApiUrl = getPersonalApi(code);
-
+            // Use single central API endpoint
+            const centralApi = getEffectiveApi(GRADES_API);
+            let promises = [];
+            
+            // 1. Save Attendance (scan)
             if (document.getElementById('attBtn').classList.contains('active-att')) {
-                p.push(fetch(`${getEffectiveApi(ATTEND_API)}?action=scan&qrCode=${code}&lectureNum=${lec}&weight=15${auth}`).then(r => r.json()).catch(e => ({})));
-                if (personalApiUrl) {
-                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('attendance .15')}&val=15`)
-                        .then(r => r.json()).then(res => console.log("Sync Attendance:", res)).catch(e => console.error("Sync Error:", e)));
-                }
+                promises.push(fetch(`${centralApi}?action=scan&qrCode=${code}&lectureNum=${lec}&weight=15${auth}`).then(r => r.json()).catch(e => ({})));
             }
 
+            // 2. Save Main Task Grade
             let taskVal = convertNumerals(document.getElementById('valTask').value);
             if (taskVal) {
-                p.push(fetch(`${getEffectiveApi(GRADES_API)}?action=saveGrade&qrCode=${code}&taskNum=${lec}&val=${taskVal}${auth}`).then(r => r.json()).catch(e => ({})));
-                if (personalApiUrl) {
-                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('Main task. 70')}&val=${taskVal}`)
-                        .then(r => r.json()).then(res => console.log("Sync Task:", res)).catch(e => console.error("Sync Error:", e)));
-                }
+                promises.push(fetch(`${centralApi}?action=saveGrade&qrCode=${code}&taskNum=${lec}&val=${taskVal}${auth}`).then(r => r.json()).catch(e => ({})));
             }
 
+            // 3. Save Quiz Grade  
             let quizVal = convertNumerals(document.getElementById('valQuiz').value);
             if (quizVal) {
-                p.push(fetch(`${getEffectiveApi(QUIZ_API)}?action=saveQuiz&qrCode=${code}&quizNum=${lec}&val=${quizVal}${auth}`).then(r => r.json()).catch(e => ({})));
-                if (personalApiUrl) {
-                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('online quize 25')}&val=${quizVal}`)
-                        .then(r => r.json()).then(res => console.log("Sync Quiz:", res)).catch(e => console.error("Sync Error:", e)));
-                }
+                promises.push(fetch(`${centralApi}?action=saveQuiz&qrCode=${code}&quizNum=${lec}&val=${quizVal}${auth}`).then(r => r.json()).catch(e => ({})));
             }
 
+            // 4. Save Extra (feedback, attitude, bonus)
             let f = document.getElementById('feedBtn').classList.contains('active-feed') ? 1 : 0;
             let a = document.getElementById('attitBtn').classList.contains('active-attit') ? 5 : 0;
             let b = convertNumerals(document.getElementById('valBonus').value) || 0;
 
             if (f || a || b != 0) {
-                p.push(fetch(`${getEffectiveApi(EXTRA_API)}?action=saveExtra&qrCode=${code}&lectureNum=${lec}&feedback=${f}&attitude=${a}&bonus=${b}${auth}`).then(r => r.json()).catch(e => ({})));
-
-                let combinedAttitude = 0;
-                if (f) combinedAttitude += 5;
-                if (a) combinedAttitude += 5;
-
-                if (personalApiUrl && combinedAttitude > 0) {
-                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('attitude .10')}&val=${combinedAttitude}`)
-                        .then(r => r.json()).then(res => console.log("Sync Combined Attitude:", res)).catch(e => console.error("Sync Error:", e)));
-                }
-
-                if (personalApiUrl && b) {
-                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('bonus')}&val=${b}`)
-                        .then(r => r.json()).then(res => console.log("Sync Bonus:", res)).catch(e => console.error("Sync Error:", e)));
-                }
+                promises.push(fetch(`${centralApi}?action=saveExtra&qrCode=${code}&lectureNum=${lec}&feedback=${f}&attitude=${a}&bonus=${b}${auth}`).then(r => r.json()).catch(e => ({})));
             }
 
-            if (p.length === 0) {
+            if (promises.length === 0) {
                 return showToast("⚠️ لم يتم إدخال أي تقييم لإرساله!", "error");
             }
 
-            // الإفراغ التلقائي السريع لمواصلة الرصد دون انتظار
+            // Auto-clear for quick continuous entry
             document.getElementById('studentCode').value = "";
             document.getElementById('valTask').value = "";
             document.getElementById('valQuiz').value = "";
@@ -1350,7 +1328,7 @@
 
             showToast("⏳ جاري التسجيل...", "success");
 
-            Promise.all(p).then(results => {
+            Promise.all(promises).then(results => {
                 let studentName = "";
                 for (let res of results) {
                     if (!res) continue;
