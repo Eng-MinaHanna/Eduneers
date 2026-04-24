@@ -1399,18 +1399,22 @@
             const code = groupLetter + num + "EDUR9";
             const auth = getAuthParams() + `&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}`;
 
-            // استخدام رابط الجروب المركزي كمصدر وحيد للحقيقة
+            // الباكند يميّز نوع الاستعلام من خلال params وليس action name:
+            // getTop + toLec فقط (بدون toTask/toQuiz) = حضور
+            // getTop + toTask فقط = تاسكات
+            // getTop + toQuiz فقط = كويز
+            // getTop + الثلاثة معاً = extra (فيدباك+سلوك+بونص)
             const groupApi = getEffectiveApi("");
             if (!groupApi) return showToast("❌ لم يتم ضبط رابط شيت الجروب في الإعدادات!", "error");
 
             showLoader(true, "جاري استرجاع سجلات الطالب من شيت الجروب 🔍...");
             try {
-                // نرسل requests منفصلة كلها لنفس الرابط المركزي مع action مختلف
-                const [rA, rX, rT, rQ] = await Promise.all([
-                    fetch(`${groupApi}?action=getTop&weight=15${auth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
-                    fetch(`${groupApi}?action=getTopExtra${auth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
-                    fetch(`${groupApi}?action=getTopGrades${auth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
-                    fetch(`${groupApi}?action=getTopQuiz${auth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] }))
+                const baseAuth = getAuthParams();
+                const [rA, rT, rQ, rX] = await Promise.all([
+                    fetch(`${groupApi}?action=getTop&weight=15&fromLec=${fl}&toLec=${tl}${baseAuth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
+                    fetch(`${groupApi}?action=getTop&fromTask=${fl}&toTask=${tl}${baseAuth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
+                    fetch(`${groupApi}?action=getTop&fromQuiz=${fl}&toQuiz=${tl}${baseAuth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
+                    fetch(`${groupApi}?action=getTop&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}&extraOnly=1${baseAuth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] }))
                 ]);
 
                 let total = 0; let html = "";
@@ -1425,9 +1429,9 @@
 
                 document.getElementById('resName').innerText = code + " — " + group;
                 addRow(rA, "إجمالي الحضور", "👤");
-                addRow(rX, "إجمالي (الفيدباك + السلوك + البونص)", "⭐");
                 addRow(rT, "إجمالي التاسكات", "📝");
                 addRow(rQ, "إجمالي الكويزات", "📊");
+                addRow(rX, "إجمالي (الفيدباك + السلوك + البونص)", "⭐");
 
                 document.getElementById('searchResult').style.display = 'block';
                 document.getElementById('resDetails').innerHTML = html;
@@ -1525,8 +1529,4 @@
         }
 
         function loadSettingMax() { }
-        function saveMaxConfig() { showToast("✅ تم حفظ الإعدادات بنجاح"); }
-    </script>
-</body>
-
-</html>
+       
