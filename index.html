@@ -1177,7 +1177,7 @@
 
         <button class="nav-btn manager-only" onclick="window.location.href='grades.html'"
           title="نظام الدرجات والتقييم">🎯</button>
-        <button class="nav-btn" id="menuBtn" onclick="toggleSidebar()" style="display:none;">☰</button>
+        <button class="nav-btn" id="menuBtn" onclick="toggleSidebar()">☰</button>
       </div>
     </div>
   </div>
@@ -1193,15 +1193,11 @@
       </div>
     </div>
 
-    <a href="#" class="active" onclick="switchView('scanner'); toggleSidebar();" id="nav-scanner">
+    <a href="#" onclick="switchView('scanner'); toggleSidebar();" id="nav-scanner">
       <span>📷</span> <span>مسح الـ QR</span>
     </a>
     <a href="#" onclick="switchView('manual'); toggleSidebar();" id="nav-manual">
       <span>✍️</span> <span>التسجيل اليدوي السريع</span>
-    </a>
-
-    <a href="grades.html" class="manager-only" style="color: var(--accent);">
-      <span>🎯</span> <span>نظام رصد الدرجات</span>
     </a>
 
     <div class="sidebar-heading">متابعة الحضور</div>
@@ -1211,16 +1207,21 @@
     <a href="#" onclick="switchView('analytics'); toggleSidebar();" id="nav-analytics" class="manager-only">
       <span>📈</span> <span>إحصائيات الجروبات</span>
     </a>
+    <a href="#" onclick="switchView('mail'); toggleSidebar();" id="nav-mail" class="manager-only">
+      <span>📧</span> <span>الإعلانات والبريد</span>
+    </a>
 
     <div class="sidebar-heading admin-only">إدارة النظام</div>
     <a href="#" onclick="switchView('users'); toggleSidebar();" id="nav-users" class="admin-only">
       <span>👥</span> <span>إدارة المستخدمين</span>
     </a>
-    <a href="#" onclick="localStorage.setItem('savedView', 'settings'); window.location.href='Grades.html';" class="manager-only">
-      <span>⚙️</span> <span>إعدادات قاعدة البيانات</span>
+
+    <div style="height:1px; background:rgba(255,255,255,0.1); margin: 15px 10px;"></div>
+    <a href="grades.html" style="color: var(--accent);">
+      <span>🎯</span> <span>نظام رصد الدرجات</span>
     </a>
 
-    <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+    <div style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
       <a href="#" onclick="logout();" style="color: #ef4444;">🚪 تسجيل الخروج</a>
     </div>
   </div>
@@ -2266,14 +2267,14 @@
 
     function loadDashboard() {
       const lec = document.getElementById('lecture').value; const group = localStorage.getItem('userGroup') || "Group A";
-      const tbody = document.getElementById('attendeesList'); tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 30px;">⏳ المزامنة بالخلفية...</td></tr>`;
-      
+      const tbody = document.getElementById('attendeesList'); tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 30px;">⏳ المزامنة...</td></tr>`;
+      showProgress("سحب بيانات الحضور...");
       fetch(`${getEffectiveApi(ATTENDANCE_API_URL)}?action=getDashboard&lectureNum=${encodeURIComponent(lec)}&group=${encodeURIComponent(group)}${getAuthParams()}`)
         .then(res => res.json()).then(data => {
-          document.getElementById('dashCount').innerText = data.count || 0;
+          completeProgress(); document.getElementById('dashCount').innerText = data.count || 0;
           if (data.status === "success" && data.attendees.length > 0) { allAttendees = data.attendees.map((d, i) => ({ ...d, _originalIdx: i })); renderTable(allAttendees); }
           else { allAttendees = []; tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 30px; color:var(--text-muted);">لا توجد سجلات حالياً</td></tr>`; }
-        }).catch(err => { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#ef4444; padding: 30px;">❌ خطأ</td></tr>`; });
+        }).catch(err => { completeProgress(); tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#ef4444; padding: 30px;">❌ خطأ</td></tr>`; });
     }
 
     function renderTable(dataArray) {
@@ -2404,6 +2405,7 @@
           }
         })
         .catch(err => {
+          completeProgress();
           showToast("❌ فشل في الاتصال بالإنترنت أو قاعدة البيانات.", "error");
         });
     }
@@ -2452,11 +2454,13 @@
     function loadUsers() {
       const tbody = document.getElementById('usersList');
       if (!tbody) return;
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 20px;">⏳ جاري جلب الهيكل الإداري...</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 20px;">⏳ جاري فك التشفير...</td></tr>`;
+      showProgress("قراءة بروتوكولات الأمان...");
 
       fetch(`${LOGIN_API_URL}?action=getUsers${getAuthParams()}`)
         .then(res => res.json())
         .then(data => {
+          completeProgress();
           if (data.status === "success" && data.users && data.users.length > 0) {
             allSystemUsers = data.users.filter(u => u.role !== 'Owner');
             renderUsersTable(allSystemUsers);
@@ -2464,7 +2468,7 @@
             allSystemUsers = [];
             tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 30px;">الخادم خالي أو لا صلاحيات</td></tr>`;
           }
-        }).catch(err => { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#ef4444; padding: 30px;">❌ حدث خطأ في جلب البيانات</td></tr>`; });
+        }).catch(err => { completeProgress(); tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#ef4444; padding: 30px;">❌ حدث خطأ في جلب البيانات</td></tr>`; });
     }
 
     function renderUsersTable(usersToRender) {
