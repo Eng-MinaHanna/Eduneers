@@ -1079,15 +1079,14 @@
         async function prefetchGroupData() {
             const auth = getAuthParams();
             const fl = 1, tl = 20;
-            const params = `${auth}&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}`;
             try {
-                const [rT, rQ, rA, rX] = await Promise.all([
-                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop${params}`).then(r => r.json()).catch(() => ({})),
-                    fetch(`${getEffectiveApi(QUIZ_API)}?action=getTop${params}`).then(r => r.json()).catch(() => ({})),
-                    fetch(`${getEffectiveApi(ATTEND_API)}?action=getTop&weight=15${params}`).then(r => r.json()).catch(() => ({})),
-                    fetch(`${getEffectiveApi(EXTRA_API)}?action=getTop${params}`).then(r => r.json()).catch(() => ({}))
+                const [rTasks, rQuizzes, rAttend, rExtra] = await Promise.all([
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromTask=${fl}&toTask=${tl}${auth}`).then(r => r.json()).catch(() => ({})),
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromQuiz=${fl}&toQuiz=${tl}${auth}`).then(r => r.json()).catch(() => ({})),
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromLec=${fl}&toLec=${tl}&weight=15${auth}`).then(r => r.json()).catch(() => ({})),
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&extraOnly=1&fromLec=${fl}&toLec=${tl}${auth}`).then(r => r.json()).catch(() => ({}))
                 ]);
-                _prefetchCache = { tasks: rT, quizzes: rQ, attendance: rA, extras: rX, params };
+                _prefetchCache = { tasks: rTasks, quizzes: rQuizzes, attendance: rAttend, extras: rExtra, params: `fl=${fl}&tl=${tl}` };
                 _prefetchDone = true;
                 console.log("✅ Background prefetch complete");
             } catch (e) {
@@ -1386,23 +1385,19 @@
 
             showLoader(true, "جاري استرجاع سجلات الطالب 🔍...");
             try {
-                let rA, rX, rT, rQ;
-
-                // ⚡ Use cache if range is 1-20 and prefetch is done
-                if (_prefetchDone && parseInt(fl) === 1 && parseInt(tl) === 20) {
-                    rA = _prefetchCache.attendance;
-                    rX = _prefetchCache.extras;
-                    rT = _prefetchCache.tasks;
-                    rQ = _prefetchCache.quizzes;
-                } else {
-                    const auth = getAuthParams() + `&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}`;
-                    [rA, rX, rT, rQ] = await Promise.all([
-                        fetch(`${getEffectiveApi(ATTEND_API)}?action=getTop&weight=15${auth}`).then(r => r.json()),
-                        fetch(`${getEffectiveApi(EXTRA_API)}?action=getTop${auth}`).then(r => r.json()),
-                        fetch(`${getEffectiveApi(GRADES_API)}?action=getTop${auth}`).then(r => r.json()),
-                        fetch(`${getEffectiveApi(QUIZ_API)}?action=getTop${auth}`).then(r => r.json())
-                    ]);
-                }
+                const auth = getAuthParams();
+                
+                // Fetch each category separately with correct parameters
+                const [rAttend, rTasks, rQuizzes, rExtra] = await Promise.all([
+                    // Attendance: uses fromLec/toLec (no task or quiz params)
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromLec=${fl}&toLec=${tl}&weight=15${auth}`).then(r => r.json()),
+                    // Main Tasks: uses fromTask/toTask
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromTask=${fl}&toTask=${tl}${auth}`).then(r => r.json()),
+                    // Quizzes: uses fromQuiz/toQuiz  
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromQuiz=${fl}&toQuiz=${tl}${auth}`).then(r => r.json()),
+                    // Extra (feedback + attitude + bonus): uses extraOnly
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&extraOnly=1&fromLec=${fl}&toLec=${tl}${auth}`).then(r => r.json())
+                ]);
 
                 let total = 0; let html = "";
                 const addRow = (res, label) => {
@@ -1414,17 +1409,23 @@
                 };
 
                 document.getElementById('resName').innerText = "لم يتم العثور على اسم";
-                addRow(rA, "إجمالي الحضور");
-                addRow(rX, "إجمالي (الفيدباك + السلوك + البونص)");
-                addRow(rT, "إجمالي التاسكات");
-                addRow(rQ, "إجمالي الكويزات");
+                
+                // Each API returns its own category data
+                addRow(rAttend, "إجمالي الحضور");
+                addRow(rTasks, "إجمالي التاسكات");
+                addRow(rQuizzes, "إجمالي الكويزات");
+                addRow(rExtra, "إجمالي (الفيدباك + السلوك + البونص)");
 
                 document.getElementById('searchResult').style.display = 'block';
                 document.getElementById('resDetails').innerHTML = html;
                 document.getElementById('resTotal').innerText = total;
                 showLoader(false);
 
-            } catch (e) { showLoader(false); showToast("❌ خطأ في جلب البيانات", "error"); }
+            } catch (e) { 
+                console.error(e);
+                showLoader(false); 
+                showToast("❌ خطأ في جلب البيانات", "error"); 
+            }
         }
 
         let fullLeaderboard = [];
@@ -1434,26 +1435,18 @@
 
             showLoader(true, "جاري تحليل بيانات الجروب لاستخراج الترتيب 🏆...");
             try {
-                let rT, rQ, rA, rX;
+                const auth = getAuthParams();
 
-                // ⚡ Use cache if range is 1-20 and prefetch is done
-                if (_prefetchDone && parseInt(fl) === 1 && parseInt(tl) === 20) {
-                    rT = _prefetchCache.tasks;
-                    rQ = _prefetchCache.quizzes;
-                    rA = _prefetchCache.attendance;
-                    rX = _prefetchCache.extras;
-                } else {
-                    const auth = getAuthParams() + `&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}`;
-                    [rT, rQ, rA, rX] = await Promise.all([
-                        fetch(`${getEffectiveApi(GRADES_API)}?action=getTop${auth}`).then(r => r.json()),
-                        fetch(`${getEffectiveApi(QUIZ_API)}?action=getTop${auth}`).then(r => r.json()),
-                        fetch(`${getEffectiveApi(ATTEND_API)}?action=getTop&weight=15${auth}`).then(r => r.json()),
-                        fetch(`${getEffectiveApi(EXTRA_API)}?action=getTop${auth}`).then(r => r.json())
-                    ]);
-                }
+                // Fetch each category separately
+                const [rTasks, rQuizzes, rAttend, rExtra] = await Promise.all([
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromTask=${fl}&toTask=${tl}${auth}`).then(r => r.json()),
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromQuiz=${fl}&toQuiz=${tl}${auth}`).then(r => r.json()),
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromLec=${fl}&toLec=${tl}&weight=15${auth}`).then(r => r.json()),
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&extraOnly=1&fromLec=${fl}&toLec=${tl}${auth}`).then(r => r.json())
+                ]);
 
                 let m = {};
-                const col = (d) => {
+                const col = (d, weight = 1) => {
                     if (d.status === 'success') {
                         d.scores.forEach(s => {
                             let val = parseFloat(s.total);
@@ -1465,7 +1458,7 @@
                     }
                 };
 
-                col(rT); col(rQ); col(rA); col(rX);
+                col(rTasks); col(rQuizzes); col(rAttend); col(rExtra);
 
                 fullLeaderboard = Object.values(m).sort((a, b) => b.t - a.t);
                 fullLeaderboard.forEach((s, idx) => s.rank = idx + 1);
@@ -1483,7 +1476,11 @@
                 let top5 = fullLeaderboard.slice(0, 5);
                 renderChart(top5.map(x => (x.n || "").split(" ")[0]), top5.map(x => x.t));
 
-            } catch (e) { showLoader(false); showToast("❌ فشل استخراج الترتيب", "error"); }
+            } catch (e) { 
+                console.error(e);
+                showLoader(false); 
+                showToast("❌ فشل استخراج الترتيب", "error"); 
+            }
         }
 
         function renderLeaderboard(dataArray) {
