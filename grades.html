@@ -842,28 +842,16 @@
                     </select>
                 </div>
 
-                <div class="grid-3" style="gap:10px; margin-bottom:10px;">
+                <div class="grid-3">
                     <div class="toggle-btn" id="attBtn" onclick="this.classList.toggle('active-att')">👤 حضور (15)</div>
-                    <div class="toggle-btn" id="feedBtn" onclick="this.classList.toggle('active-feed')">💬 فيدباك
+                    <div class="toggle-btn" id="feedBtn" onclick="this.classList.toggle('active-feed')">💬 فيدباك (5)
                     </div>
-                    <div class="toggle-btn" id="attitBtn" onclick="this.classList.toggle('active-attit')">⭐ سلوك
+                    <div class="toggle-btn" id="attitBtn" onclick="this.classList.toggle('active-attit')">⭐ سلوك (5)
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
-                    <div>
-                        <label style="font-size:11px; font-weight:bold; color:var(--text-muted); display:block; margin-bottom:4px;">درجة الفيدباك</label>
-                        <input type="number" id="valFeed" placeholder="0" style="margin:0; padding:10px; font-size:13px;">
-                    </div>
-                    <div>
-                        <label style="font-size:11px; font-weight:bold; color:var(--text-muted); display:block; margin-bottom:4px;">درجة السلوك</label>
-                        <input type="number" id="valAttitude" placeholder="0" style="margin:0; padding:10px; font-size:13px;">
-                    </div>
-                    <div>
-                        <label style="font-size:11px; font-weight:bold; color:var(--text-muted); display:block; margin-bottom:4px;">البونص</label>
-                        <input type="number" id="valBonus" placeholder="0" style="margin:0; padding:10px; font-size:13px;">
-                    </div>
-                </div>
+                <label style="font-size:13px; font-weight:bold; color:var(--text-muted);">بونص إضافي (Bonus)</label>
+                <input type="number" id="valBonus" placeholder="0">
 
                 <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1); margin:15px 0;">
 
@@ -1080,13 +1068,32 @@
             fillGroupSelects();
             loadLinksDatabase();
 
-            // فحص التحويل القادم من index.html (כمثل زر الإعدادات)
-            const savedView = localStorage.getItem('savedView');
-            if (savedView) {
-                switchView(savedView);
-                localStorage.removeItem('savedView');
-            }
+            // 🚀 Background Prefetch: sılently load data so views are instant
+            setTimeout(() => prefetchGroupData(), 2000);
         };
+
+        // Cache storage for prefetched data
+        let _prefetchCache = {};
+        let _prefetchDone = false;
+
+        async function prefetchGroupData() {
+            const auth = getAuthParams();
+            const fl = 1, tl = 20;
+            const params = `${auth}&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}`;
+            try {
+                const [rT, rQ, rA, rX] = await Promise.all([
+                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop${params}`).then(r => r.json()).catch(() => ({})),
+                    fetch(`${getEffectiveApi(QUIZ_API)}?action=getTop${params}`).then(r => r.json()).catch(() => ({})),
+                    fetch(`${getEffectiveApi(ATTEND_API)}?action=getTop&weight=15${params}`).then(r => r.json()).catch(() => ({})),
+                    fetch(`${getEffectiveApi(EXTRA_API)}?action=getTop${params}`).then(r => r.json()).catch(() => ({}))
+                ]);
+                _prefetchCache = { tasks: rT, quizzes: rQ, attendance: rA, extras: rX, params };
+                _prefetchDone = true;
+                console.log("✅ Background prefetch complete");
+            } catch (e) {
+                console.log("Prefetch skipped:", e);
+            }
+        }
 
         function loadLinksDatabase() {
             fetch(`${CENTRAL_LINKS_API}?action=getAllLinks`)
@@ -1164,34 +1171,16 @@
             const monitor = document.getElementById('mappedLinksMonitor');
             if (!monitor) return;
             let linksMap = JSON.parse(localStorage.getItem('PERSONAL_LINKS_MAP') || '{}');
-            const currentGroup = localStorage.getItem('userGroup') || "Group A";
-            const groupApiUrl = localStorage.getItem(`GROUP_API_${currentGroup}`) || "";
 
             let html = "";
-
-            // إظهار رابط الجروب الأساسي في الأعلى
-            html += `<div style="border-bottom:2px solid rgba(245,176,65,0.3); padding:6px 0; margin-bottom:8px;">
-                        <div style="font-size:10px; color:var(--accent); font-weight:bold; margin-bottom:2px;">🔗 رابط شيت الجروب الأساسي (Group Scope):</div>
-                        <div style="font-family:monospace; font-size:9px; color:#fff; word-break:break-all; opacity:0.8;">${groupApiUrl ? groupApiUrl.substring(0, 70) + '...' : '❌ لم يتم ضبطه بعد'}</div>
-                     </div>`;
-
-            let count = Object.keys(linksMap).length;
-            if (count > 0) {
-                html += `<div style="font-size:10px; color:var(--electric-blue); margin-bottom:5px; font-weight:bold;">📋 الروابط الفردية المربوطة (${count} طالب):</div>`;
-                for (let code in linksMap) {
-                    const url = linksMap[code];
-                    const shortUrl = url ? url.substring(url.indexOf('/s/') + 3, url.indexOf('/s/') + 18) + '...' : 'غير محدد';
-                    html += `<div style="border-bottom:1px solid rgba(255,255,255,0.05); padding:4px 0; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
-                                <span style="color:var(--electric-blue); font-weight:bold; font-size:10px;">${code}</span>
-                                <span style="opacity:0.7; font-size:9px; font-family:monospace; margin: 0 6px;">${shortUrl}</span>
-                                <button onclick="removePersonalLink('${code}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px;" title="حذف">🗑️</button>
-                             </div>`;
-                }
-            } else {
-                html += `<div style='text-align:center; opacity:0.5; font-size:10px; margin-top:8px;'>لا يوجد روابط فردية مسجلة حالياً...</div>`;
+            for (let code in linksMap) {
+                html += `<div style="border-bottom:1px solid rgba(255,255,255,0.05); padding:4px 0; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="color:var(--electric-blue); font-weight:bold;">${code}</span>
+                            <span style="opacity:0.6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%; margin:0 10px;">${linksMap[code]}</span>
+                            <button onclick="removePersonalLink('${code}')" style="background:none; border:none; color:#ef4444; cursor:pointer;" title="حذف">🗑️</button>
+                         </div>`;
             }
-
-            monitor.innerHTML = html;
+            monitor.innerHTML = html || "<div style='text-align:center; opacity:0.5;'>لا يوجد روابط مسجلة حالياً...</div>";
         }
 
         function removePersonalLink(code) {
@@ -1324,30 +1313,23 @@
                 }
             }
 
-            let f = parseFloat(convertNumerals(document.getElementById('valFeed').value)) || 0;
-            let a = parseFloat(convertNumerals(document.getElementById('valAttitude').value)) || 0;
-            let b = parseFloat(convertNumerals(document.getElementById('valBonus').value)) || 0;
+            let f = document.getElementById('feedBtn').classList.contains('active-feed') ? 1 : 0;
+            let a = document.getElementById('attitBtn').classList.contains('active-attit') ? 5 : 0;
+            let b = convertNumerals(document.getElementById('valBonus').value) || 0;
 
-            // تحقق من toggle — إذا كان مفعلاً واستخدم القيمة المدخلة أو القيمة الافتراضية
-            const feedActive = document.getElementById('feedBtn').classList.contains('active-feed');
-            const attitActive = document.getElementById('attitBtn').classList.contains('active-attit');
-            const feedVal = feedActive ? (f || 5) : f;
-            const attitVal = attitActive ? (a || 5) : a;
+            if (f || a || b != 0) {
+                p.push(fetch(`${getEffectiveApi(EXTRA_API)}?action=saveExtra&qrCode=${code}&lectureNum=${lec}&feedback=${f}&attitude=${a}&bonus=${b}${auth}`).then(r => r.json()).catch(e => ({})));
 
-            if (feedVal || attitVal || b) {
-                p.push(fetch(`${getEffectiveApi(EXTRA_API)}?action=saveExtra&qrCode=${code}&lectureNum=${lec}&feedback=${feedVal}&attitude=${attitVal}&bonus=${b}${auth}`).then(r => r.json()).catch(e => ({})));
+                let combinedAttitude = 0;
+                if (f) combinedAttitude += 5;
+                if (a) combinedAttitude += 5;
 
-                if (personalApiUrl && feedVal > 0) {
-                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('attendance .15')}&val=${feedVal}`)
-                        .then(r => r.json()).then(res => console.log("Sync Feed:", res)).catch(e => console.error("Sync Error:", e)));
+                if (personalApiUrl && combinedAttitude > 0) {
+                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('attitude .10')}&val=${combinedAttitude}`)
+                        .then(r => r.json()).then(res => console.log("Sync Combined Attitude:", res)).catch(e => console.error("Sync Error:", e)));
                 }
 
-                if (personalApiUrl && attitVal > 0) {
-                    p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('attitude .10')}&val=${attitVal}`)
-                        .then(r => r.json()).then(res => console.log("Sync Attitude:", res)).catch(e => console.error("Sync Error:", e)));
-                }
-
-                if (personalApiUrl && b > 0) {
+                if (personalApiUrl && b) {
                     p.push(fetch(`${personalApiUrl}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskNameCol)}&category=${encodeURIComponent('bonus')}&val=${b}`)
                         .then(r => r.json()).then(res => console.log("Sync Bonus:", res)).catch(e => console.error("Sync Error:", e)));
                 }
@@ -1362,8 +1344,6 @@
             document.getElementById('valTask').value = "";
             document.getElementById('valQuiz').value = "";
             document.getElementById('valBonus').value = "";
-            document.getElementById('valFeed').value = "";
-            document.getElementById('valAttitude').value = "";
             document.getElementById('attBtn').classList.remove('active-att');
             document.getElementById('feedBtn').classList.remove('active-feed');
             document.getElementById('attitBtn').classList.remove('active-attit');
@@ -1401,51 +1381,50 @@
             let fl = document.getElementById('sfL').value, tl = document.getElementById('stL').value;
             if (parseInt(fl) > parseInt(tl)) return showToast("❌ نطاق المحاضرات غير صحيح", "error");
 
-            const group = localStorage.getItem('userGroup') || "Group A";
-            const groupLetter = group.replace("Group ", "").trim();
-            const code = groupLetter + num + "EDUR9";
-            const auth = getAuthParams() + `&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}`;
+            const group = localStorage.getItem('userGroup');
+            const code = group.replace("Group ", "").trim() + num + "EDUR9";
 
-            // الباكند يميّز نوع الاستعلام من خلال params وليس action name:
-            // getTop + toLec فقط (بدون toTask/toQuiz) = حضور
-            // getTop + toTask فقط = تاسكات
-            // getTop + toQuiz فقط = كويز
-            // getTop + الثلاثة معاً = extra (فيدباك+سلوك+بونص)
-            const groupApi = getEffectiveApi("");
-            if (!groupApi) return showToast("❌ لم يتم ضبط رابط شيت الجروب في الإعدادات!", "error");
-
-            showLoader(true, "جاري استرجاع سجلات الطالب من شيت الجروب 🔍...");
+            showLoader(true, "جاري استرجاع سجلات الطالب 🔍...");
             try {
-                const baseAuth = getAuthParams();
-                const [rA, rT, rQ, rX] = await Promise.all([
-                    fetch(`${groupApi}?action=getTop&weight=15&fromLec=${fl}&toLec=${tl}${baseAuth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
-                    fetch(`${groupApi}?action=getTop&fromTask=${fl}&toTask=${tl}${baseAuth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
-                    fetch(`${groupApi}?action=getTop&fromQuiz=${fl}&toQuiz=${tl}${baseAuth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] })),
-                    fetch(`${groupApi}?action=getTop&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}&extraOnly=1${baseAuth}`).then(r => r.json()).catch(() => ({ status: 'error', scores: [] }))
-                ]);
+                let rA, rX, rT, rQ;
+
+                // ⚡ Use cache if range is 1-20 and prefetch is done
+                if (_prefetchDone && parseInt(fl) === 1 && parseInt(tl) === 20) {
+                    rA = _prefetchCache.attendance;
+                    rX = _prefetchCache.extras;
+                    rT = _prefetchCache.tasks;
+                    rQ = _prefetchCache.quizzes;
+                } else {
+                    const auth = getAuthParams() + `&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}`;
+                    [rA, rX, rT, rQ] = await Promise.all([
+                        fetch(`${getEffectiveApi(ATTEND_API)}?action=getTop&weight=15${auth}`).then(r => r.json()),
+                        fetch(`${getEffectiveApi(EXTRA_API)}?action=getTop${auth}`).then(r => r.json()),
+                        fetch(`${getEffectiveApi(GRADES_API)}?action=getTop${auth}`).then(r => r.json()),
+                        fetch(`${getEffectiveApi(QUIZ_API)}?action=getTop${auth}`).then(r => r.json())
+                    ]);
+                }
 
                 let total = 0; let html = "";
-                const addRow = (res, label, icon) => {
+                const addRow = (res, label) => {
                     let s = (res.scores || []).find(x => x.id === code);
                     let val = (s && !isNaN(parseFloat(s.total))) ? parseFloat(s.total) : 0;
-                    let color = val > 0 ? 'var(--electric-blue)' : 'rgba(255,255,255,0.3)';
-                    html += `<tr><td>${icon} ${label}</td><td><span style="color:${color}; font-size:1.1rem; font-weight:900;">${val}</span></td></tr>`;
+                    html += `<tr><td>${label}</td><td><span style="color:var(--electric-blue); font-size:1.1rem;">${val}</span></td></tr>`;
                     total += val;
                     if (s && s.name) document.getElementById('resName').innerText = s.name;
                 };
 
-                document.getElementById('resName').innerText = code + " — " + group;
-                addRow(rA, "إجمالي الحضور", "👤");
-                addRow(rT, "إجمالي التاسكات", "📝");
-                addRow(rQ, "إجمالي الكويزات", "📊");
-                addRow(rX, "إجمالي (الفيدباك + السلوك + البونص)", "⭐");
+                document.getElementById('resName').innerText = "لم يتم العثور على اسم";
+                addRow(rA, "إجمالي الحضور");
+                addRow(rX, "إجمالي (الفيدباك + السلوك + البونص)");
+                addRow(rT, "إجمالي التاسكات");
+                addRow(rQ, "إجمالي الكويزات");
 
                 document.getElementById('searchResult').style.display = 'block';
                 document.getElementById('resDetails').innerHTML = html;
                 document.getElementById('resTotal').innerText = total;
                 showLoader(false);
 
-            } catch (e) { showLoader(false); showToast("❌ خطأ في جلب البيانات من شيت الجروب", "error"); }
+            } catch (e) { showLoader(false); showToast("❌ خطأ في جلب البيانات", "error"); }
         }
 
         let fullLeaderboard = [];
@@ -1453,16 +1432,25 @@
             let fl = document.getElementById('fL').value, tl = document.getElementById('tL').value;
             if (parseInt(fl) > parseInt(tl)) return showToast("❌ نطاق المحاضرات غير صحيح", "error");
 
-            const auth = getAuthParams() + `&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}`;
-
             showLoader(true, "جاري تحليل بيانات الجروب لاستخراج الترتيب 🏆...");
             try {
-                const [rT, rQ, rA, rX] = await Promise.all([
-                    fetch(`${getEffectiveApi(GRADES_API)}?action=getTop${auth}`).then(r => r.json()),
-                    fetch(`${getEffectiveApi(QUIZ_API)}?action=getTop${auth}`).then(r => r.json()),
-                    fetch(`${getEffectiveApi(ATTEND_API)}?action=getTop&weight=15${auth}`).then(r => r.json()),
-                    fetch(`${getEffectiveApi(EXTRA_API)}?action=getTop${auth}`).then(r => r.json())
-                ]);
+                let rT, rQ, rA, rX;
+
+                // ⚡ Use cache if range is 1-20 and prefetch is done
+                if (_prefetchDone && parseInt(fl) === 1 && parseInt(tl) === 20) {
+                    rT = _prefetchCache.tasks;
+                    rQ = _prefetchCache.quizzes;
+                    rA = _prefetchCache.attendance;
+                    rX = _prefetchCache.extras;
+                } else {
+                    const auth = getAuthParams() + `&fromLec=${fl}&toLec=${tl}&fromTask=${fl}&toTask=${tl}&fromQuiz=${fl}&toQuiz=${tl}`;
+                    [rT, rQ, rA, rX] = await Promise.all([
+                        fetch(`${getEffectiveApi(GRADES_API)}?action=getTop${auth}`).then(r => r.json()),
+                        fetch(`${getEffectiveApi(QUIZ_API)}?action=getTop${auth}`).then(r => r.json()),
+                        fetch(`${getEffectiveApi(ATTEND_API)}?action=getTop&weight=15${auth}`).then(r => r.json()),
+                        fetch(`${getEffectiveApi(EXTRA_API)}?action=getTop${auth}`).then(r => r.json())
+                    ]);
+                }
 
                 let m = {};
                 const col = (d) => {
