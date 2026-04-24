@@ -1283,31 +1283,84 @@ function submitData() {
             // Use single central API endpoint
             const centralApi = getEffectiveApi(GRADES_API);
             let promises = [];
+            let taskName = "TASK " + lec;
             
-            // 1. Save Attendance (scan)
+            // 1. Save Attendance (scan) - Central
             if (document.getElementById('attBtn').classList.contains('active-att')) {
                 promises.push(fetch(`${centralApi}?action=scan&qrCode=${code}&lectureNum=${lec}&weight=15${auth}`).then(r => r.json()).catch(e => ({})));
             }
 
-            // 2. Save Main Task Grade
+            // 2. Save Main Task Grade - Central
             let taskVal = convertNumerals(document.getElementById('valTask').value);
             if (taskVal) {
                 promises.push(fetch(`${centralApi}?action=saveGrade&qrCode=${code}&taskNum=${lec}&val=${taskVal}${auth}`).then(r => r.json()).catch(e => ({})));
             }
 
-            // 3. Save Quiz Grade  
+            // 3. Save Quiz Grade - Central  
             let quizVal = convertNumerals(document.getElementById('valQuiz').value);
             if (quizVal) {
                 promises.push(fetch(`${centralApi}?action=saveQuiz&qrCode=${code}&quizNum=${lec}&val=${quizVal}${auth}`).then(r => r.json()).catch(e => ({})));
             }
 
-            // 4. Save Extra (feedback, attitude, bonus)
+            // 4. Save Extra (feedback, attitude, bonus) - Central
             let f = document.getElementById('feedBtn').classList.contains('active-feed') ? 1 : 0;
             let a = document.getElementById('attitBtn').classList.contains('active-attit') ? 5 : 0;
             let b = convertNumerals(document.getElementById('valBonus').value) || 0;
 
             if (f || a || b != 0) {
                 promises.push(fetch(`${centralApi}?action=saveExtra&qrCode=${code}&lectureNum=${lec}&feedback=${f}&attitude=${a}&bonus=${b}${auth}`).then(r => r.json()).catch(e => ({})));
+            }
+
+            // === SYNC to Individual Student Sheet ===
+            let personalApi = getPersonalApi(code);
+            if (personalApi) {
+                console.log("Syncing to personal sheet:", personalApi);
+                
+                // Attendance
+                if (document.getElementById('attBtn').classList.contains('active-att')) {
+                    promises.push(
+                        fetch(`${personalApi}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskName)}&category=${encodeURIComponent('attendance .15')}&val=15`)
+                        .then(r => r.json()).then(res => console.log("Sync Attendance:", res)).catch(e => console.error("Sync Error:", e))
+                    );
+                }
+                
+                // Main Task
+                if (taskVal) {
+                    promises.push(
+                        fetch(`${personalApi}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskName)}&category=${encodeURIComponent('Main task. 70')}&val=${taskVal}`)
+                        .then(r => r.json()).then(res => console.log("Sync Task:", res)).catch(e => console.error("Sync Error:", e))
+                    );
+                }
+                
+                // Quiz
+                if (quizVal) {
+                    promises.push(
+                        fetch(`${personalApi}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskName)}&category=${encodeURIComponent('online quize 25')}&val=${quizVal}`)
+                        .then(r => r.json()).then(res => console.log("Sync Quiz:", res)).catch(e => console.error("Sync Error:", e))
+                    );
+                }
+                
+                // Extra (attitude + feedback)
+                let combinedAtt = 0;
+                if (f) combinedAtt += 5;  // feedback = 5
+                if (a) combinedAtt += 5;  // attitude = 5
+                
+                if (combinedAtt > 0) {
+                    promises.push(
+                        fetch(`${personalApi}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskName)}&category=${encodeURIComponent('attitude .10')}&val=${combinedAtt}`)
+                        .then(r => r.json()).then(res => console.log("Sync Attitude:", res)).catch(e => console.error("Sync Error:", e))
+                    );
+                }
+                
+                // Bonus
+                if (b) {
+                    promises.push(
+                        fetch(`${personalApi}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskName)}&category=${encodeURIComponent('bonus')}&val=${b}`)
+                        .then(r => r.json()).then(res => console.log("Sync Bonus:", res)).catch(e => console.error("Sync Error:", e))
+                    );
+                }
+            } else {
+                console.log("No personal API found for:", code);
             }
 
             if (promises.length === 0) {
