@@ -1079,6 +1079,13 @@
 
             fillGroupSelects();
             loadLinksDatabase();
+
+            // فحص التحويل القادم من index.html (כمثل زر الإعدادات)
+            const savedView = localStorage.getItem('savedView');
+            if (savedView) {
+                switchView(savedView);
+                localStorage.removeItem('savedView');
+            }
         };
 
         function loadLinksDatabase() {
@@ -1529,4 +1536,8 @@
         }
 
         function loadSettingMax() { }
-       
+        function saveMaxConfig() { showToast("✅ تم حفظ الإعدادات بنجاح"); }
+    </script>
+</body>
+
+</html>
