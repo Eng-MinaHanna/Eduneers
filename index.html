@@ -2341,7 +2341,7 @@
 
       const lec = document.getElementById('lecture').value; const group = localStorage.getItem('userGroup') || "Group A";
 
-      fetch(`${ATTENDANCE_API_URL}?action=deleteAttendance&qrCode=${encodeURIComponent(studentCode)}&lectureNum=${encodeURIComponent(lec)}&group=${encodeURIComponent(group)}${getAuthParams()}`)
+      fetch(`${getEffectiveApi(ATTENDANCE_API_URL)}?action=deleteAttendance&qrCode=${encodeURIComponent(studentCode)}&lectureNum=${encodeURIComponent(lec)}&group=${encodeURIComponent(group)}${getAuthParams()}`)
         .then(res => res.json()).then(data => {
           if (data.status === 'success') {
             showToast("✅ تمت إزالة السجل نهائياً", "success");
