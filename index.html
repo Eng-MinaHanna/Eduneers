@@ -2225,7 +2225,7 @@
       document.getElementById('manualCode').value = "";
     }
 
-    function sendDataToAPI(studentCode) {
+   function sendDataToAPI(studentCode) {
       if (!studentCode) return;
       studentCode = studentCode.toUpperCase();
       if (!studentCode.endsWith("EDUR9")) { studentCode = studentCode + "EDUR9"; }
@@ -2247,6 +2247,7 @@
         updateOfflineBadge(); showToast("⚠️ تم الحفظ محلياً لعدم توفر إنترنت", "warning"); playBeep('success'); return;
       }
 
+      // 1️⃣ إرسال الحضور إلى الشيت المركزي (Diploma Sheets)
       fetch(`${getEffectiveApi(ATTENDANCE_API_URL)}?action=scan&qrCode=${encodeURIComponent(studentCode)}&lectureNum=${encodeURIComponent(lec)}&group=${encodeURIComponent(group)}${getAuthParams()}`)
         .then(res => res.json()).then(data => {
           if (data.status === "success") {
@@ -2263,6 +2264,18 @@
           localStorage.setItem('offlineQueue', JSON.stringify(offlineQueue));
           updateOfflineBadge(); showToast("⚠️ تم الحفظ محلياً لضعف الشبكة.", "warning"); playBeep('success');
         });
+
+      // 2️⃣ الجزء الجديد: إرسال الحضور إلى الشيت الفردي للطالب في نفس اللحظة ⚡
+      let linksMap = JSON.parse(localStorage.getItem('PERSONAL_LINKS_MAP') || '{}');
+      let personalApi = linksMap[studentCode]; // البحث عن رابط الـ API الخاص بالطالب
+      
+      if (personalApi) {
+          console.log("Syncing attendance to personal sheet:", personalApi);
+          fetch(`${personalApi}?action=scan&qrCode=${encodeURIComponent(studentCode)}&lectureNum=${encodeURIComponent(lec)}`)
+            .then(r => r.json())
+            .then(res => console.log("Personal Sheet Synced:", res))
+            .catch(e => console.error("Personal Sheet Sync Error:", e));
+      }
     }
 
     function loadDashboard() {
