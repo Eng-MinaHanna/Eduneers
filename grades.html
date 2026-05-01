@@ -6,7 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title> Eduneers | Grades System </title>
     <link rel="manifest" href="manifest.json">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/chart.js" as="script">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
@@ -135,6 +137,7 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            flex-shrink: 0;
             transition: 0.3s;
             font-size: 1.1rem;
         }
@@ -150,13 +153,17 @@
             top: 0;
             right: -300px;
             width: 280px;
-            height: 100%;
+            height: 100vh;
+            height: 100dvh;
             background: var(--card-bg);
             backdrop-filter: blur(25px);
             z-index: 2000;
             transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             text-align: right;
             padding-top: 60px;
+            padding-bottom: 120px;
+            overflow-y: auto;
+            overflow-x: hidden;
             box-shadow: -10px 0 30px rgba(0, 0, 0, 0.2);
             border-left: 1px solid rgba(255, 255, 255, 0.1);
         }
@@ -627,6 +634,15 @@
             display: flex !important;
         }
 
+        body.role-cadre-leader :not(.view-section).manager-only,
+        body.role-cadre-leader :not(.view-section).cross-group-only {
+            display: block !important;
+        }
+
+        body.role-cadre-leader a.manager-only {
+            display: flex !important;
+        }
+
         body.role-co-founder :not(.view-section).manager-only,
         body.role-co-founder :not(.view-section).admin-only,
         body.role-co-founder :not(.view-section).cross-group-only {
@@ -642,6 +658,13 @@
         body.role-owner :not(.view-section).admin-only,
         body.role-owner :not(.view-section).cross-group-only {
             display: block !important;
+        }
+
+        body.role-admin #groupBadge,
+        body.role-cadre-leader #groupBadge,
+        body.role-co-founder #groupBadge,
+        body.role-owner #groupBadge {
+            display: none !important;
         }
 
         body.role-owner a.manager-only,
@@ -774,8 +797,10 @@
                         style="font-size: 11px; opacity:0.7;"></span></h2>
             </div>
             <div class="nav-actions">
-                <span id="groupBadge"
-                    style="font-size: 11px; font-weight: 800; background: rgba(0, 210, 255, 0.1); color: var(--electric-blue); padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(0, 210, 255, 0.3); display: none;"></span>
+                <select id="globalGroupSelect" class="cross-group-only" style="background: rgba(192, 132, 252, 0.1); border: 1px solid rgba(192, 132, 252, 0.4); color: #c084fc; border-radius: 8px; padding: 0 10px; height: 28px; font-size: 11px; font-weight: 800; cursor: pointer; outline: none; margin: 0 5px; display: none; box-sizing: border-box; align-self: center; flex-shrink: 0;" onchange="changeGlobalGroup(this.value)"></select>
+                <span id="groupBadge" class="nav-badge group-badge"
+                    style="font-size: 11px; font-weight: 800; background: rgba(0, 210, 255, 0.1); color: var(--electric-blue); padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(0, 210, 255, 0.3); display: none; white-space: nowrap; flex-shrink: 0;"></span>
+                <span id="roleBadge" class="nav-badge role-badge" style="font-size: 11px; font-weight: 800; background: rgba(245, 176, 65, 0.1); color: var(--accent); padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(245, 176, 65, 0.3); display: none; white-space: nowrap; flex-shrink: 0;"></span>
                 <button class="nav-btn" onclick="toggleDarkMode()">🌓</button>
                 <button class="nav-btn" onclick="toggleSidebar()">☰</button>
             </div>
@@ -785,43 +810,62 @@
     <div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
     <div class="sidebar" id="sidebar">
         <button class="close-btn" onclick="toggleSidebar()">×</button>
-        <div
-            style="padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 10px;">
-            <div style="font-weight: 900; color: var(--electric-blue); font-size: 1.3rem;">نظام التقييم المركزي</div>
-            <div id="sideRole"
-                style="font-size: 10px; opacity: 0.7; margin-top: 5px; text-transform: uppercase; background: rgba(255,255,255,0.1); display: inline-block; padding: 4px 10px; border-radius: 8px;">
+        <div style="padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 10px;">
+            <div style="font-weight: 900; color: var(--electric-blue); font-size: 1.3rem;">Eduneers System</div>
+            <div id="sideRole" style="font-size: 10px; opacity: 0.7; margin-top: 5px; text-transform: uppercase; background: rgba(255,255,255,0.1); display: inline-block; padding: 4px 10px; border-radius: 8px;"></div>
+        </div>
+
+        <!-- Attendance Section -->
+        <div style="margin: 10px 15px; border-radius: 12px; border: 1px solid rgba(0, 210, 255, 0.3); box-shadow: 0 0 15px rgba(0, 210, 255, 0.05); overflow: hidden;">
+            <div style="background: rgba(0, 210, 255, 0.1); padding: 8px 15px; font-weight: 900; color: #00d2ff; font-size: 12px; letter-spacing: 1px; border-bottom: 1px solid rgba(0, 210, 255, 0.1);">📷 قسم الحضور</div>
+            <div style="padding: 5px 0;">
+                <a href="#" onclick="gotoView('index.html', 'scanner')" id="nav-scanner"><span>📷</span> <span>مسح الـ QR</span></a>
+                <a href="#" onclick="gotoView('index.html', 'manual')" id="nav-manual"><span>✍️</span> <span>التسجيل اليدوي السريع</span></a>
+                <a href="#" onclick="gotoView('index.html', 'dashboard')" id="nav-dashboard"><span>📊</span> <span>لوحة الحضور</span></a>
+                <a href="#" onclick="gotoView('index.html', 'analytics')" id="nav-analytics" class="manager-only"><span>📈</span> <span>إحصائيات الجروبات</span></a>
+                <a href="#" onclick="gotoView('index.html', 'mail')" id="nav-mail" class="manager-only"><span>📧</span> <span>الإعلانات والبريد</span></a>
             </div>
         </div>
 
-        <a href="#" class="active" onclick="switchView('grading'); toggleSidebar();" id="nav-grading">
-            <span>📝</span> <span>رصد الدرجات</span>
-        </a>
-        <a href="#" onclick="switchView('searchView'); toggleSidebar();" id="nav-searchView">
-            <span>🔍</span> <span>استعلام عن طالب</span>
-        </a>
-        <a href="#" class="manager-only" onclick="switchView('topView'); toggleSidebar();" id="nav-topView">
-            <span>🏆</span> <span>لوحة الشرف Top 5</span>
-        </a>
-        <a href="#" class="manager-only" onclick="switchView('settings'); toggleSidebar();" id="nav-settings">
-            <span>⚙️</span> <span>إعدادات النظام</span>
-        </a>
+        <!-- Grades Section -->
+        <div style="margin: 15px 15px; border-radius: 12px; border: 1px solid rgba(192, 132, 252, 0.3); box-shadow: 0 0 15px rgba(192, 132, 252, 0.05); overflow: hidden;">
+            <div style="background: rgba(192, 132, 252, 0.1); padding: 8px 15px; font-weight: 900; color: #c084fc; font-size: 12px; letter-spacing: 1px; border-bottom: 1px solid rgba(192, 132, 252, 0.1);">🎯 قسم الدرجات والتقييم</div>
+            <div style="padding: 5px 0;">
+                <a href="#" onclick="gotoView('grades.html', 'grading')" id="nav-grading"><span>📝</span> <span>رصد الدرجات</span></a>
+                <a href="#" onclick="gotoView('grades.html', 'searchView')" id="nav-searchView"><span>🔍</span> <span>استعلام عن طالب</span></a>
+                <a href="#" onclick="gotoView('grades.html', 'topView')" id="nav-topView" class="manager-only"><span>🏆</span> <span>لوحة الشرف Top 5</span></a>
+                <a href="#" onclick="gotoView('grades.html', 'settings')" id="nav-settings" class="manager-only"><span>⚙️</span> <span>إعدادات النظام</span></a>
+            </div>
+        </div>
 
-        <div style="height: 1px; background: rgba(255,255,255,0.1); margin: 15px 25px;"></div>
-        <a href="index.html" style="color: var(--accent);"><span>🏠</span> <span>نظام الحضور</span></a>
-        <a href="#" onclick="logout()" style="color: #ef4444; margin-top: 10px;"><span>🚪</span> <span>تسجيل
-                الخروج</span></a>
+        <!-- Admin Section -->
+        <div class="admin-only" style="margin: 15px 15px; border-radius: 12px; border: 1px solid rgba(245, 176, 65, 0.3); box-shadow: 0 0 15px rgba(245, 176, 65, 0.05); overflow: hidden;">
+            <div style="background: rgba(245, 176, 65, 0.1); padding: 8px 15px; font-weight: 900; color: #f5b041; font-size: 12px; letter-spacing: 1px; border-bottom: 1px solid rgba(245, 176, 65, 0.1);">⚙️ الإدارة العليا</div>
+            <div style="padding: 5px 0;">
+                <a href="#" onclick="gotoView('index.html', 'users')" id="nav-users" class="admin-only"><span>👥</span> <span>إدارة المستخدمين</span></a>
+            </div>
+        </div>
+
+        <a href="#" onclick="logout()" style="color: #ef4444; margin: 15px; background: rgba(239, 68, 68, 0.1); border-radius: 12px; text-align: center; justify-content: center;"><span>🚪</span> <span>تسجيل الخروج</span></a>
+        <div style="height: 100px; flex-shrink: 0;"></div>
     </div>
 
     <div class="container">
         <div id="toast"></div>
 
-        <div class="cross-group-only"
-            style="background: var(--card-bg); padding: 15px; border-radius: 16px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); text-align:center; box-shadow: 0 10px 20px rgba(0,0,0,0.05);">
-            <label style="font-weight: 800; color: #c084fc; font-size: 13px; display:block; margin-bottom:10px;">تحكم
-                الجروب 👑</label>
-            <select id="globalGroupSelect"
-                style="margin-bottom:0; max-width: 300px; border-color:#c084fc; color:#c084fc;"
-                onchange="changeGlobalGroup(this.value)"></select>
+        <div class="manager-only">
+            <script>
+                // Added global gotoView for unified sidebar navigation
+                function gotoView(page, view) {
+                    localStorage.setItem('savedView', view);
+                    if (window.location.pathname.endsWith(page)) {
+                        switchView(view);
+                        toggleSidebar();
+                    } else {
+                        window.location.href = page;
+                    }
+                }
+            </script>
         </div>
 
         <div id="view-grading" class="view-section active">
@@ -1036,6 +1080,71 @@
 
         let myChart = null;
 
+        // Smart caching system for grades
+        const GRADES_CACHE = {
+            leaderboard: { data: null, timestamp: 0, params: '' },
+            search: { data: null, timestamp: 0, code: '' }
+        };
+        const GRADES_CACHE_TTL = 20000; // 20 seconds
+
+        // Prefetch system for grades - loads data in background
+        const GRADES_PREFETCH = {
+            enabled: true,
+            idleTime: 4000,
+            timeout: null,
+
+            start: function () {
+                if (!this.enabled || this.timeout) return;
+                this.timeout = setTimeout(() => this.prefetchData(), this.idleTime);
+            },
+
+            cancel: function () {
+                if (this.timeout) {
+                    clearTimeout(this.timeout);
+                    this.timeout = null;
+                }
+            },
+
+            prefetchData: function () {
+                this.enabled = false;
+
+                const auth = getAuthParams();
+                const group = localStorage.getItem('userGroup') || "Group A";
+
+                // Fire and forget prefetch for common ranges
+                fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromTask=1&toTask=5${auth}`, { method: 'HEAD' })
+                    .catch(() => { });
+                fetch(`${getEffectiveApi(GRADES_API)}?action=getTop&fromLec=1&toLec=5${auth}`, { method: 'HEAD' })
+                    .catch(() => { });
+            }
+        };
+
+        // Track activity to trigger prefetch
+        ['click', 'keydown', 'scroll'].forEach(evt => {
+            document.addEventListener(evt, () => GRADES_PREFETCH.start(), { passive: true });
+        });
+
+        function getGradesCached(key) {
+            const cache = GRADES_CACHE[key];
+            if (cache && cache.data && (Date.now() - cache.timestamp < GRADES_CACHE_TTL)) {
+                return cache.data;
+            }
+            return null;
+        }
+
+        function setGradesCache(key, data, extra = '') {
+            GRADES_CACHE[key] = { data, timestamp: Date.now(), params: extra };
+        }
+
+        function clearGradesCache(key) {
+            if (key) {
+                GRADES_CACHE[key] = { data: null, timestamp: 0, params: '' };
+            } else {
+                GRADES_CACHE.leaderboard = { data: null, timestamp: 0, params: '' };
+                GRADES_CACHE.search = { data: null, timestamp: 0, code: '' };
+            }
+        }
+
         // 🔴 دالة تحويل الأرقام العربية إلى إنجليزية
         function convertNumerals(str) {
             const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
@@ -1053,6 +1162,12 @@
             document.getElementById('welcomeName').innerText = `| ${name}`;
             document.getElementById('sideRole').innerText = rawRole;
 
+            const rBadge = document.getElementById('roleBadge');
+            if (rBadge) {
+                rBadge.innerText = (role === 'OWNER') ? 'المالك 👑' : (role === 'CO-FOUNDER') ? 'CO-Founder 🌟' : (role === 'TEAM MANAGER' || role === 'ADMIN') ? 'Team Manager' : (role === 'CADRE LEADER') ? 'Cadre Leader 🌟' : (role === 'COORDINATOR' || role === 'MANAGER') ? 'Coordinator' : 'Cadre';
+                rBadge.style.display = 'inline-block';
+            }
+
             const groupVal = localStorage.getItem('userGroup') || "Group A";
             document.getElementById('groupBadge').innerText = groupVal;
             document.getElementById('groupBadge').style.display = "inline-block";
@@ -1060,6 +1175,9 @@
             if (role === 'OWNER') document.body.classList.add('role-owner');
             else if (role === 'CO-FOUNDER') document.body.classList.add('role-co-founder');
             else if (role === 'TEAM MANAGER' || role === 'ADMIN') document.body.classList.add('role-admin');
+            else if (role === 'CADRE LEADER') {
+                document.body.classList.add('role-cadre-leader');
+            }
             else if (role === 'COORDINATOR' || role === 'MANAGER') document.body.classList.add('role-manager');
             else document.body.classList.add('role-user');
 
@@ -1149,6 +1267,11 @@
             // If they just typed "K1", append standard suffix
             if (!code.includes("EDUR")) code = code + "EDUR9";
 
+            const groupLetter = currentGroup.replace("Group ", "").trim();
+            if (!code.startsWith(groupLetter)) {
+                return showToast("❌ لا تملك صلاحية التعديل على جروب آخر!", "error");
+            }
+
             showToast("⏳ جاري الحفظ في الـ Database المركزية...", "info");
             fetch(`${CENTRAL_LINKS_API}?action=saveIndividual&code=${encodeURIComponent(code)}&url=${encodeURIComponent(url)}&group=${encodeURIComponent(currentGroup)}`)
                 .then(r => r.json())
@@ -1168,19 +1291,28 @@
             const monitor = document.getElementById('mappedLinksMonitor');
             if (!monitor) return;
             let linksMap = JSON.parse(localStorage.getItem('PERSONAL_LINKS_MAP') || '{}');
+            const currentGroup = localStorage.getItem('userGroup') || "Group A";
+            const groupLetter = currentGroup.replace("Group ", "").trim();
 
             let html = "";
             for (let code in linksMap) {
+                if (!code.startsWith(groupLetter)) continue;
                 html += `<div style="border-bottom:1px solid rgba(255,255,255,0.05); padding:4px 0; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
                             <span style="color:var(--electric-blue); font-weight:bold;">${code}</span>
                             <span style="opacity:0.6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%; margin:0 10px;">${linksMap[code]}</span>
                             <button onclick="removePersonalLink('${code}')" style="background:none; border:none; color:#ef4444; cursor:pointer;" title="حذف">🗑️</button>
                          </div>`;
             }
-            monitor.innerHTML = html || "<div style='text-align:center; opacity:0.5;'>لا يوجد روابط مسجلة حالياً...</div>";
+            monitor.innerHTML = html || "<div style='text-align:center; opacity:0.5;'>لا يوجد روابط مسجلة حالياً لهذا الجروب...</div>";
         }
 
         function removePersonalLink(code) {
+            const currentGroup = localStorage.getItem('userGroup') || "Group A";
+            const groupLetter = currentGroup.replace("Group ", "").trim();
+            if (!code.startsWith(groupLetter)) {
+                return showToast("❌ غير مصرح لك بحذف كود من جروب آخر!", "error");
+            }
+
             showToast("⏳ جاري الحذف من الـ Database...", "info");
             fetch(`${CENTRAL_LINKS_API}?action=removeIndividual&code=${encodeURIComponent(code)}`)
                 .then(r => r.json())
@@ -1239,11 +1371,32 @@
 
         function changeGlobalGroup(val) {
             localStorage.setItem('userGroup', val);
-            document.getElementById('groupBadge').innerText = val;
+            const groupBadge = document.getElementById('groupBadge');
+            if(groupBadge) groupBadge.innerText = val;
 
             // Refresh API input field for new group selection
             if (document.getElementById('groupApiInput')) {
                 document.getElementById('groupApiInput').value = localStorage.getItem(`GROUP_API_${val}`) || "";
+            }
+
+            // Auto-refresh active views
+            const activeTab = document.querySelector('.view-section.active');
+            if (activeTab) {
+                if (activeTab.id === 'view-settings') {
+                    if (typeof loadLinksDatabase === 'function') loadLinksDatabase();
+                    if (typeof refreshLinksMonitor === 'function') refreshLinksMonitor();
+                } else if (activeTab.id === 'view-topView') {
+                    if (typeof extractLeaderboard === 'function') extractLeaderboard(false);
+                } else if (activeTab.id === 'view-grading') {
+                    const gradeTable = document.getElementById('gradeTable');
+                    const res = document.getElementById('result');
+                    if(gradeTable) gradeTable.style.display = 'none';
+                    if(res) res.style.display = 'none';
+                    if (typeof prefetchGroupData === 'function') prefetchGroupData();
+                } else if (activeTab.id === 'view-searchView') {
+                    const searchRes = document.getElementById('searchResult');
+                    if(searchRes) searchRes.style.display = 'none';
+                }
             }
         }
 
@@ -1270,7 +1423,11 @@
             return `&email=${encodeURIComponent(localStorage.getItem('userEmail'))}&token=${encodeURIComponent(localStorage.getItem('sessionToken'))}&group=${encodeURIComponent(localStorage.getItem('userGroup'))}`;
         }
 
-function submitData() {
+        let _isSubmitting = false;
+
+        function submitData() {
+            if (_isSubmitting) return;
+
             let numRaw = document.getElementById('studentCode').value.trim();
             if (!numRaw) return showToast("❌ برجاء إدخال رقم كود الطالب", "error");
 
@@ -1280,11 +1437,13 @@ function submitData() {
             const lec = document.getElementById('currentLecNum').value;
             const auth = getAuthParams();
 
+            _isSubmitting = true;
+
             // Use single central API endpoint
             const centralApi = getEffectiveApi(GRADES_API);
             let promises = [];
             let taskName = "TASK " + lec;
-            
+
             // 1. Save Attendance (scan) - Central
             if (document.getElementById('attBtn').classList.contains('active-att')) {
                 promises.push(fetch(`${centralApi}?action=scan&qrCode=${code}&lectureNum=${lec}&weight=15${auth}`).then(r => r.json()).catch(e => ({})));
@@ -1315,48 +1474,48 @@ function submitData() {
             let personalApi = getPersonalApi(code);
             if (personalApi) {
                 console.log("Syncing to personal sheet:", personalApi);
-                
+
                 // Attendance
                 if (document.getElementById('attBtn').classList.contains('active-att')) {
                     promises.push(
                         fetch(`${personalApi}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskName)}&category=${encodeURIComponent('attendance .15')}&val=15`)
-                        .then(r => r.json()).then(res => console.log("Sync Attendance:", res)).catch(e => console.error("Sync Error:", e))
+                            .then(r => r.json()).then(res => console.log("Sync Attendance:", res)).catch(e => console.error("Sync Error:", e))
                     );
                 }
-                
+
                 // Main Task
                 if (taskVal) {
                     promises.push(
                         fetch(`${personalApi}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskName)}&category=${encodeURIComponent('Main task. 70')}&val=${taskVal}`)
-                        .then(r => r.json()).then(res => console.log("Sync Task:", res)).catch(e => console.error("Sync Error:", e))
+                            .then(r => r.json()).then(res => console.log("Sync Task:", res)).catch(e => console.error("Sync Error:", e))
                     );
                 }
-                
+
                 // Quiz
                 if (quizVal) {
                     promises.push(
                         fetch(`${personalApi}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskName)}&category=${encodeURIComponent('online quize 25')}&val=${quizVal}`)
-                        .then(r => r.json()).then(res => console.log("Sync Quiz:", res)).catch(e => console.error("Sync Error:", e))
+                            .then(r => r.json()).then(res => console.log("Sync Quiz:", res)).catch(e => console.error("Sync Error:", e))
                     );
                 }
-                
+
                 // Extra (attitude + feedback)
                 let combinedAtt = 0;
                 if (f) combinedAtt += 5;  // feedback = 5
                 if (a) combinedAtt += 5;  // attitude = 5
-                
+
                 if (combinedAtt > 0) {
                     promises.push(
                         fetch(`${personalApi}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskName)}&category=${encodeURIComponent('attitude .10')}&val=${combinedAtt}`)
-                        .then(r => r.json()).then(res => console.log("Sync Attitude:", res)).catch(e => console.error("Sync Error:", e))
+                            .then(r => r.json()).then(res => console.log("Sync Attitude:", res)).catch(e => console.error("Sync Error:", e))
                     );
                 }
-                
+
                 // Bonus
                 if (b) {
                     promises.push(
                         fetch(`${personalApi}?action=update&qrCode=${code}&taskName=${encodeURIComponent(taskName)}&category=${encodeURIComponent('bonus')}&val=${b}`)
-                        .then(r => r.json()).then(res => console.log("Sync Bonus:", res)).catch(e => console.error("Sync Error:", e))
+                            .then(r => r.json()).then(res => console.log("Sync Bonus:", res)).catch(e => console.error("Sync Error:", e))
                     );
                 }
             } else {
@@ -1364,8 +1523,11 @@ function submitData() {
             }
 
             if (promises.length === 0) {
+                _isSubmitting = false;
                 return showToast("⚠️ لم يتم إدخال أي تقييم لإرساله!", "error");
             }
+
+            _isSubmitting = false;
 
             // Auto-clear for quick continuous entry
             document.getElementById('studentCode').value = "";
@@ -1415,7 +1577,7 @@ function submitData() {
             showLoader(true, "جاري استرجاع سجلات الطالب 🔍...");
             try {
                 const auth = getAuthParams();
-                
+
                 // Fetch each category separately with correct parameters
                 const [rAttend, rTasks, rQuizzes, rExtra] = await Promise.all([
                     // Attendance: uses fromLec/toLec (no task or quiz params)
@@ -1438,7 +1600,7 @@ function submitData() {
                 };
 
                 document.getElementById('resName').innerText = "لم يتم العثور على اسم";
-                
+
                 // Each API returns its own category data
                 addRow(rAttend, "إجمالي الحضور");
                 addRow(rTasks, "إجمالي التاسكات");
@@ -1450,17 +1612,33 @@ function submitData() {
                 document.getElementById('resTotal').innerText = total;
                 showLoader(false);
 
-            } catch (e) { 
+            } catch (e) {
                 console.error(e);
-                showLoader(false); 
-                showToast("❌ خطأ في جلب البيانات", "error"); 
+                showLoader(false);
+                showToast("❌ خطأ في جلب البيانات", "error");
             }
         }
 
         let fullLeaderboard = [];
-        async function extractLeaderboard() {
+        async function extractLeaderboard(useCache = true) {
             let fl = document.getElementById('fL').value, tl = document.getElementById('tL').value;
             if (parseInt(fl) > parseInt(tl)) return showToast("❌ نطاق المحاضرات غير صحيح", "error");
+
+            // Check cache first
+            const cacheParams = `fl=${fl}&tl=${tl}`;
+            if (useCache) {
+                const cached = getGradesCached('leaderboard');
+                if (cached && GRADES_CACHE.leaderboard.params === cacheParams) {
+                    fullLeaderboard = cached;
+                    renderLeaderboard(fullLeaderboard);
+                    if (fullLeaderboard.length > 0) {
+                        document.getElementById('chartWrapper').style.display = 'block';
+                        let top5 = fullLeaderboard.slice(0, 5);
+                        renderChart(top5.map(x => (x.n || "").split(" ")[0]), top5.map(x => x.t));
+                    }
+                    return;
+                }
+            }
 
             showLoader(true, "جاري تحليل بيانات الجروب لاستخراج الترتيب 🏆...");
             try {
@@ -1505,10 +1683,13 @@ function submitData() {
                 let top5 = fullLeaderboard.slice(0, 5);
                 renderChart(top5.map(x => (x.n || "").split(" ")[0]), top5.map(x => x.t));
 
-            } catch (e) { 
+                // Save to cache
+                setGradesCache('leaderboard', fullLeaderboard, cacheParams);
+
+            } catch (e) {
                 console.error(e);
-                showLoader(false); 
-                showToast("❌ فشل استخراج الترتيب", "error"); 
+                showLoader(false);
+                showToast("❌ فشل استخراج الترتيب", "error");
             }
         }
 
