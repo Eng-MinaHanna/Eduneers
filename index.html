@@ -1900,7 +1900,7 @@
   <script>
     const CENTRAL_LINKS_API = "https://script.google.com/macros/s/AKfycbxFT_0yMGQMp2tK_F3G_ndN-b5URC-PQOxaT63rLPExzCNyV6p9-UKGpKELVnJbc2LA/exec";
 
-    let ATTENDANCE_API_URL = "https://script.google.com/macros/s/AKfycbx715VQ1MfNK_yLaX6m2rrNaGrJANjIGss9ysM4Sv8z6npcjVJOdnGZZDbJL74-oxDu/exec";
+    let ATTENDANCE_API_URL = "https://script.google.com/macros/s/AKfycbw6v50o3s8mR5_D4-L9wE8j6D7eM8lO7fE2zK_O5I8S71577H3T4F9M49D6B8o/exec";
     let LOGIN_API_URL = "https://script.google.com/macros/s/AKfycbw-oytOWrgERm2yXu-NagMlyS14HlUGeAlsWqrZl2SwRJIi0IDL1AH2VduQvsmIIkNgFA/exec";
 
     // 🔗 دالة اختيار الـ API المناسب المخصص للجروب
@@ -2419,51 +2419,66 @@
       link.href = URL.createObjectURL(blob); link.download = `Report_${group}_Lec_${lec}.csv`; link.click(); showToast("✅ تم التصدير", "success");
     }
 
-    function fetchAnalyticsData(type = 'group') {
+    async function fetchAnalyticsData(type = 'group') {
       showProgress("تحليل البيانات وبناء الرسوم... 📈");
-      const group = localStorage.getItem('userGroup') || "Group A";
-      const lec = document.getElementById('lecture').value || "1";
+      const currentGroup = localStorage.getItem('userGroup') || "Group A";
+      const currentLec = parseInt(document.getElementById('lecture').value || "1");
       const role = (localStorage.getItem('userRole') || "").toUpperCase();
 
-      let url = "";
+      const labels = [];
+      const dataPoints = [];
       let chartTitle = "";
 
-      if (type === 'all' && (role === 'OWNER' || role === 'CO-FOUNDER')) {
-        url = `${ATTENDANCE_API_URL}?action=getOwnerAnalytics&lectureNum=${encodeURIComponent(lec)}${getAuthParams()}`;
-        document.getElementById('analyticsDesc').innerText = `📊 مقارنة حية لحضور كافة الجروبات - محاضرة ${lec}`;
-        chartTitle = 'حضور الجروبات';
-      } else {
-        url = `${ATTENDANCE_API_URL}?action=getAnalytics&group=${encodeURIComponent(group)}${getAuthParams()}`;
-        document.getElementById('analyticsDesc').innerText = `📈 تتبع كفاءة الحضور لـ ${group} على مدار الكورس`;
-        chartTitle = 'كثافة الحضور';
-      }
+      try {
+        const promises = [];
 
-      fetch(url)
-        .then(res => res.text())
-        .then(text => {
-          completeProgress();
-          try {
-            const data = JSON.parse(text);
-            if (data.status === "success") {
-              if (data.labels && data.labels.length > 0) {
-                document.getElementById('analyticsDesc').style.display = 'block';
-                renderAnalyticsChart(data.labels, data.data, chartTitle);
-              } else {
-                showToast("⚠️ لا توجد بيانات حضور كافية للرسم البياني حتى الآن.", "warning");
-                if (attendanceChartInstance) { attendanceChartInstance.destroy(); }
-              }
-            } else {
-              showToast(data.message || "حدث خطأ في جلب البيانات من السيرفر", "error");
-            }
-          } catch (e) {
-            console.error("Server Error Response:", text);
-            showToast("❌ خطأ في الاستجابة من السيرفر الرئيسي.", "error");
+        if (type === 'all' && (role === 'OWNER' || role === 'CO-FOUNDER' || role === 'ADMIN')) {
+          document.getElementById('analyticsDesc').innerText = `📊 مقارنة حية لحضور الجروبات - محاضرة ${currentLec}`;
+          chartTitle = 'حضور الجروبات';
+          
+          const groupSelect = document.getElementById('globalGroupSelect');
+          const groups = groupSelect ? Array.from(groupSelect.options).map(opt => opt.value) : ["Group A", "Group B", "Group K"];
+          
+          groups.forEach(g => {
+            labels.push(g);
+            const url = `${getEffectiveApi(ATTENDANCE_API_URL)}?action=getDashboard&lectureNum=${currentLec}&group=${encodeURIComponent(g)}${getAuthParams()}`;
+            promises.push(fetch(url).then(r => r.json()).catch(() => ({count: 0})));
+          });
+
+        } else {
+          document.getElementById('analyticsDesc').innerText = `📈 تتبع كفاءة الحضور لـ ${currentGroup} حتى المحاضرة ${currentLec}`;
+          chartTitle = 'كثافة الحضور';
+          
+          // Fetch from lec 1 to currentLec
+          for (let i = 1; i <= currentLec; i++) {
+            labels.push(`م ${i}`);
+            const url = `${getEffectiveApi(ATTENDANCE_API_URL)}?action=getDashboard&lectureNum=${i}&group=${encodeURIComponent(currentGroup)}${getAuthParams()}`;
+            promises.push(fetch(url).then(r => r.json()).catch(() => ({count: 0})));
           }
-        })
-        .catch(err => {
-          completeProgress();
-          showToast("❌ فشل في الاتصال بالإنترنت أو قاعدة البيانات.", "error");
+        }
+
+        const results = await Promise.all(promises);
+        results.forEach(res => {
+          dataPoints.push(res.count || 0);
         });
+
+        completeProgress();
+        document.getElementById('analyticsDesc').style.display = 'block';
+        
+        // التحقق من وجود بيانات
+        const hasData = dataPoints.some(val => val > 0);
+        if (hasData) {
+            renderAnalyticsChart(labels, dataPoints, chartTitle);
+        } else {
+            showToast("⚠️ لا توجد بيانات حضور كافية للرسم البياني حتى الآن.", "warning");
+            if (attendanceChartInstance) { attendanceChartInstance.destroy(); }
+        }
+
+      } catch (err) {
+        completeProgress();
+        console.error(err);
+        showToast("❌ فشل في الاتصال بالإنترنت أو قاعدة البيانات.", "error");
+      }
     }
 
     function loadAnalytics(type = 'group') {
